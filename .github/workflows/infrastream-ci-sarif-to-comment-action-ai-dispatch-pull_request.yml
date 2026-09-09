@@ -96,7 +96,7 @@ jobs:
     steps:
       - id: rerun-failed
         name: Retry Failed Jobs
-        run: gh run rerun ${{ github.run_id }} --failed
+        run: gh run rerun ${{ github.run_id }} --failed -R ${{ github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
         if: needs.dispatch.outputs.command != 'fallthrough' && fromJSON(github.run_attempt) < 2
