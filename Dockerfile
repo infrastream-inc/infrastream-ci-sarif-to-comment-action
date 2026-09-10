@@ -2,7 +2,7 @@
 
 # 1. Base Image: Use Node 24 on Debian 13 (Trixie)
 # This instantly fixes the "ancient npm" vulnerabilities.
-FROM node:24.13.1-trixie-slim
+FROM node:24.21.0-trixie-slim
 
 WORKDIR /app
 
@@ -43,7 +43,11 @@ RUN set -e; \
 # FIX: Added --ignore-scripts to ALL commands to prevent 'node-gyp' from
 # trying to compile native addons (which causes exit code 127 on slim images).
 # FIX: Used $(npm root -g) to dynamically find the install path.
-RUN npm install -g npm@latest --ignore-scripts && \
+# npm upgrade is pinned to its major: npm@latest can raise its required node
+# range past the pinned base image (npm 12 demanded node >=24.15 while the base
+# was 24.13 — EBADENGINE broke every consumer's merge gate on 2026-09-10).
+# A major pin still pulls npm 11.x security patches without that failure mode.
+RUN npm install -g npm@11 --ignore-scripts && \
     npm install -g @security-alert/sarif-to-comment@1.10.10 --omit=dev --ignore-scripts && \
     # <--- The Security Patch Layer --->
     cd "$(npm root -g)/@security-alert/sarif-to-comment" && \
