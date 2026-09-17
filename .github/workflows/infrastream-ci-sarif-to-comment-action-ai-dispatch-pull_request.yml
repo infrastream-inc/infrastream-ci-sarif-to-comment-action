@@ -11,6 +11,7 @@ run-name: ""
   pull_request:
     types:
       - opened
+      - ready_for_review
       - reopened
       - synchronize
   pull_request_review:
@@ -46,21 +47,45 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |2
-            const request = process.env.REQUEST;
-            const eventType = process.env.EVENT_TYPE
+            const request = process.env.REQUEST || '';
+            const eventType = process.env.EVENT_TYPE;
+            const isDraft = process.env.IS_DRAFT === 'true';
             core.setOutput('request', request);
+
+            // helper and review are independent: a pull request is documented AND reviewed.
+            // Routing both through a single 'command' output meant the review job could never
+            // run on a pull_request event, because that event always resolved to 'helper' --
+            // which is why the review job had never once executed.
+            const prEvents = [
+              'pull_request.opened',
+              'pull_request.reopened',
+              'pull_request.synchronize',
+              'pull_request.ready_for_review',
+            ];
+            const isPullRequest = prEvents.includes(eventType);
+
+            let runHelper = false;
+            let runReview = false;
 
             if (request.startsWith("@infrastream-bot /review")) {
               core.setOutput('command', 'review');
-              const additionalContext = request.replace(/^@infrastream-bot \/review/, '').trim();
-              core.setOutput('additional_context', additionalContext);
-            } else if (['pull_request.opened', 'pull_request.reopened', 'pull_request.synchronize'].includes(eventType)) {
+              core.setOutput('additional_context', request.replace(/^@infrastream-bot \/review/, '').trim());
+              runReview = true;                      // asked for explicitly, so drafts included
+            } else if (isPullRequest) {
               core.setOutput('command', 'helper');
+              runHelper = true;
+              // Drafts churn: reviewing every push to one spends tokens on code the author is
+              // still moving. ready_for_review picks it up the moment it becomes real.
+              runReview = !isDraft;
             } else {
               core.setOutput('command', 'fallthrough');
             }
+
+            core.setOutput('run_helper', String(runHelper));
+            core.setOutput('run_review', String(runReview));
         env:
           EVENT_TYPE: ${{ github.event_name }}.${{ github.event.action }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
           REQUEST: ${{ github.event.comment.body || github.event.review.body || github.event.issue.body }}
       - name: Acknowledge request
         run: gh issue comment "${ISSUE_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}"
@@ -74,6 +99,8 @@ jobs:
       command: ${{ steps.extract-command.outputs.command }}
       issue_number: ${{ github.event.pull_request.number || github.event.issue.number }}
       request: ${{ steps.extract-command.outputs.request }}
+      run_helper: ${{ steps.extract-command.outputs.run_helper }}
+      run_review: ${{ steps.extract-command.outputs.run_review }}
     permissions:
       contents: read
       issues: write
@@ -118,7 +145,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-    if: ${{ always() && !cancelled() && (failure() || needs.dispatch.outputs.command == 'fallthrough') }}
+    if: ${{ always() && !cancelled() && (needs.dispatch.result == 'failure' || needs.debugger.result == 'failure' || needs.helper.result == 'failure' || needs.dispatch.outputs.command == 'fallthrough') }}
   helper:
     needs:
       - dispatch
@@ -127,7 +154,7 @@ jobs:
       id-token: write
       issues: write
       pull-requests: write
-    if: ${{ needs.dispatch.outputs.command == 'helper' }}
+    if: ${{ needs.dispatch.outputs.run_helper == 'true' }}
     with:
       additional_context: ${{ needs.dispatch.outputs.additional_context }}
     secrets: inherit
@@ -138,13 +165,13 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      issues: write
       pull-requests: write
-    if: ${{ needs.dispatch.outputs.command == 'review' }}
+    if: ${{ needs.dispatch.outputs.run_review == 'true' }}
     with:
       additional_context: ${{ needs.dispatch.outputs.additional_context }}
     secrets: inherit
     uses: pvotal-tech/default-managed-workflows-private/.github/workflows/ai-review-pull_request.yml@main
+    continue-on-error: true
 permissions:
   actions: write
   contents: read
