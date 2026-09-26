@@ -158,7 +158,7 @@ jobs:
     with:
       additional_context: ${{ needs.dispatch.outputs.additional_context }}
     secrets: inherit
-    uses: pvotal-tech/default-managed-workflows-private/.github/workflows/ai-helper-pull_request.yml@main
+    uses: infrastream-inc/default-managed-workflows-private/.github/workflows/ai-helper-pull_request.yml@main
   review:
     needs:
       - dispatch
@@ -170,7 +170,7 @@ jobs:
     with:
       additional_context: ${{ needs.dispatch.outputs.additional_context }}
     secrets: inherit
-    uses: pvotal-tech/default-managed-workflows-private/.github/workflows/ai-review-pull_request.yml@main
+    uses: infrastream-inc/default-managed-workflows-private/.github/workflows/ai-review-pull_request.yml@main
 permissions:
   actions: write
   contents: read
