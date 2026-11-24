@@ -1,16 +1,7 @@
 #!/bin/bash
 
-# entrypoint.sh API
-# $1 - sarif-file
-# $2 - token
-# $3 - repository
-# $4 - branch
-# $5 - pr-number
-# $6 - title
-# $7 - show-rule-details
-# $8 - dry-run
-# $9 - odc-sarif
-# ${10} - simple
+# entrypoint.sh API $1 - sarif-file $2 - token $3 - repository $4 - branch $5 - pr-number $6 -
+# title $7 - show-rule-details $8 - dry-run $9 - odc-sarif ${10} - simple
 
 set -o pipefail
 set -eu
@@ -80,15 +71,8 @@ if [ "$ODC_SARIF" == "true" ]; then
 fi
 
 echo "Convert SARIF file $1"
-# sarif-to-issue API
-# --token
-# --title
-# --sarifContentOwner
-# --sarifContentRepo
-# --sarifContentBranch
-# --dryRun
-# --ruleDetails
-# sarif-file-path
+# sarif-to-issue API --token --title --sarifContentOwner --sarifContentRepo
+# --sarifContentBranch --dryRun --ruleDetails sarif-file-path
 npx @security-alert/sarif-to-comment --dryRun "$DRY_RUN" --token "$TOKEN" --commentUrl "$URL" --sarifContentOwner "$OWNER" --sarifContentRepo "$REPO" --sarifContentBranch "$BRANCH" --title "$TITLE" --ruleDetails "$SHOW_RULE_DETAILS" --simple "$SIMPLE" "$SARIF_FILE"
 RC=$?
 #echo "output={$RC}" >>"$GITHUB_OUTPUT"
